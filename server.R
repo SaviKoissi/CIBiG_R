@@ -8,7 +8,7 @@ shinyServer(function(input, output, session) {
   #---------------------------
   # Load MCQ questions from GitHub
   #---------------------------
-  url_mcq <- "/Users/koissi/Desktop/WAVE_project/CBIG/IntroR_Bioinfo/questions_mcq.csv"
+  url_mcq <- "https://github.com/SaviKoissi/CIBiG_R/blob/main/questions_mcq.csv"
   mcq_df <- read_csv(url_mcq, show_col_types = FALSE)
   
   #---------------------------
