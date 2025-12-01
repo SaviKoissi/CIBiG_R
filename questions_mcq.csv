@@ -9,3 +9,5 @@ Q7,"Which function reads a CSV file?","read.csv()","load()","seq()","apply()","r
 Q8,"What does prcomp() typically operate on in a bioinformatics PCA?","Raw DNA sequences","Distance matrices only","Normalized expression matrix","Protein 3D coordinates","Normalized expression matrix"
 Q9,"What is TRUE about a data.frame in R?","All columns must have the same length","Only numeric columns allowed","Cannot contain characters","Cannot be used in bioinformatics","All columns must have the same length"
 Q10,"Which Bioconductor object stores genomic intervals?","DNAStringSet","GRanges","SummarizedExperiment","matrix","GRanges"
+Q11,"Why loops should be avoided in R ?","Their writing is too error prone","Loops are fine in R","Loops are not memory efficient in R","Loops do not exist in R","Loops are not memory efficient in R"
+Q12,"How to define your working directory ?",apply(),"getwd()","setwd()","str()","setwd()"
