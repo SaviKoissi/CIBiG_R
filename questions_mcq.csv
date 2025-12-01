@@ -1,11 +1,11 @@
-﻿id,question,choice1,choice2,choice3,choice4,answer
-Q1,"What type of object is created by: genes <- c('BRCA1','TP53','EGFR') ?",Numeric vector,Character vector,Logical vector,Factor,Character vector
-Q2,"In R, matrices are stored in which order?",Row-major,Column-major,Random,Depends on OS,Column-major
-Q3,"What is the output type of list(topGenes=c('TP53','BRCA1'))$topGenes?",Numeric,Character vector,Matrix,Factor,Character vector
-Q4,What does the recycling rule do in vectorized operations?,Repeats the shorter vector to match the longer one,Truncates the longer vector,Raises a fatal error,Sorts both vectors,Repeats the
-Q5,"Given this dummy expression matrix: expr <- matrix(1:6, nrow=2), what does dim(expr) return?","(3,2)","(2,3)",-6,"(1,6)","(2,3)"
-Q6,"What does this code compute? sum(strsplit('ATGCGC','')[[1]] %in% c('G','C'))",GC content count,Sequence length,AT content,Protein mass,GC content count
-Q7,Which function reads a CSV file?,read.csv(),load(),seq(),apply(),read.csv()
-Q8,What does prcomp() typically operate on in a bioinformatics PCA?,Raw DNA sequences,Distance matrices only,Normalized expression matrix,Protein 3D coordinates,Normalized expression matrix
-Q9,What is TRUE about a data.frame in R?,All columns must have the same length,Only numeric columns allowed,Cannot contain characters,Cannot be used in bioinformatics,All columns must have th
-Q10,Which Bioconductor object stores genomic intervals?,DNAStringSet,GRanges,SummarizedExperiment,matrix,GRanges
+id,question,choice1,choice2,choice3,choice4,answer
+Q1,"What type of object is created by: genes <- c('BRCA1','TP53','EGFR') ?","Numeric vector","Character vector","Logical vector","Factor","Character vector"
+Q2,"In R, matrices are stored in which order?","Row-major","Column-major","Random","Depends on OS","Column-major"
+Q3,"What is the output type of list(topGenes=c('TP53','BRCA1'))$topGenes?","Numeric","Character vector","Matrix","Factor","Character vector"
+Q4,"What does the recycling rule do in vectorized operations?","Repeats the shorter vector to match the longer one","Truncates the longer vector","Raises a fatal error","Sorts both vectors","Repeats the shorter vector to match the longer one"
+Q5,"Given this dummy expression matrix: expr <- matrix(1:6, nrow=2), what does dim(expr) return?","(3,2)","(2,3)","(6)","(1,6)","(2,3)"
+Q6,"What does this code compute? sum(strsplit('ATGCGC','')[[1]] %in% c('G','C'))","GC content count","Sequence length","AT content","Protein mass","GC content count"
+Q7,"Which function reads a CSV file?","read.csv()","load()","seq()","apply()","read.csv()"
+Q8,"What does prcomp() typically operate on in a bioinformatics PCA?","Raw DNA sequences","Distance matrices only","Normalized expression matrix","Protein 3D coordinates","Normalized expression matrix"
+Q9,"What is TRUE about a data.frame in R?","All columns must have the same length","Only numeric columns allowed","Cannot contain characters","Cannot be used in bioinformatics","All columns must have the same length"
+Q10,"Which Bioconductor object stores genomic intervals?","DNAStringSet","GRanges","SummarizedExperiment","matrix","GRanges"
