@@ -80,7 +80,7 @@ shinyServer(function(input, output, session) {
   # -----------------------------
   # 2. Load MCQ data safely
   # -----------------------------
-  url_mcq <- "/Users/koissi/Desktop/WAVE_project/CBIG/IntroR_Bioinfo/questions_mcq.csv"
+  url_mcq <- "https://github.com/SaviKoissi/CIBiG_R/blob/main/questions_mcq.csv"
   
   mcq_df <- tryCatch({
     # read_csv returns a tibble; coerce to data.frame for stable indexing
