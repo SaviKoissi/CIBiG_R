@@ -5,18 +5,41 @@ library(dplyr)
 
 shinyServer(function(input, output, session) {
   
-  #---------------------------
-  # Load MCQ questions from GitHub
-  #---------------------------
-url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CIBiG_R/main/questions_mcq.csv"
-
-mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
-
-  mcq_df <- read_csv(url_mcq, show_col_types = FALSE)
+  #=====================================================
+  # TIMER: 1 hour (3600 seconds)
+  #=====================================================
+  total_time <- 3600   # 1 hour
+  rv <- reactiveValues(time_left = total_time)
   
-  #---------------------------
-  # Build UI for MCQs dynamically
-  #---------------------------
+  # Update timer every second
+  autoInvalidate <- reactiveTimer(1000)
+  
+  observe({
+    autoInvalidate()
+    rv$time_left <- rv$time_left - 1
+    
+    # Display remaining time in mm:ss
+    mins <- sprintf("%02d", rv$time_left %/% 60)
+    secs <- sprintf("%02d", rv$time_left %% 60)
+    output$timer <- renderText(paste0("⏱ Remaining time: ", mins, ":", secs))
+    
+    # If timer ends → autosubmit + quit
+    if (rv$time_left <= 0) {
+      isolate({
+        submit_quiz(auto = TRUE)
+      })
+    }
+  })
+  
+  #=====================================================
+  # Load MCQ Questions
+  #=====================================================
+  url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CIBiG_R/main/questions_mcq.csv"
+  mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
+  
+  #=====================================================
+  # Render MCQs
+  #=====================================================
   output$mcq_ui <- renderUI({
     lapply(seq_len(nrow(mcq_df)), function(i) {
       q <- mcq_df[i, ]
@@ -26,15 +49,15 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
         radioButtons(
           inputId = q$id,
           label = "Choose:",
-          choices = as.character(q[ , c("choice1","choice2","choice3","choice4")])
+          choices = as.character(q[, c("choice1","choice2","choice3","choice4")])
         )
       )
     })
   })
   
-  #---------------------------
-  # Code questions (static or from GitHub)
-  #---------------------------
+  #=====================================================
+  # Code Questions
+  #=====================================================
   code_questions <- list(
     C1 = "Write R code to compute GC content of 'ATGCGC'.",
     C2 = "Given counts <- c(10,5,8), write code to compute its mean."
@@ -49,9 +72,9 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
     })
   })
   
-  #---------------------------
-  # Evaluate code safely
-  #---------------------------
+  #=====================================================
+  # Safe Evaluation Function
+  #=====================================================
   safe_eval <- function(code) {
     tryCatch({
       val <- eval(parse(text = code))
@@ -61,17 +84,15 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
     })
   }
   
-  #---------------------------
-  # Grading logic
-  #---------------------------
-  observeEvent(input$submit, {
+  #=====================================================
+  # QUIZ SUBMISSION FUNCTION (manual or auto)
+  #=====================================================
+  submit_quiz <- function(auto = FALSE) {
     
-    if (input$student == "") {
-      output$result <- renderText("Please enter your name before submitting.")
-      return()
-    }
+    student_name <- ifelse(is.null(input$student) || input$student == "",
+                           "Unknown Student", input$student)
     
-    # MCQ grading
+    # MCQ Scoring
     mcq_score <- 0
     total_mcq <- nrow(mcq_df)
     
@@ -82,13 +103,10 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
       }
     }
     
-    # Code question grading (simple keyword presence or dummy grading)
+    # Code scoring
     code_score <- 0
     total_code <- length(code_questions)
     
-    # Example simple grading rules:
-    # C1: must include "sum" or "%in%" or both
-    # C2: must include "mean"
     code_rules <- list(
       C1 = c("sum", "%in%", "nchar"),
       C2 = c("mean")
@@ -97,8 +115,6 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
     for (id in names(code_questions)) {
       ans <- input[[id]]
       required <- code_rules[[id]]
-      
-      # check if any required keyword appears
       if (any(sapply(required, function(k) grepl(k, ans, fixed = TRUE)))) {
         code_score <- code_score + 1
       }
@@ -107,13 +123,10 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
     total_score <- mcq_score + code_score
     total_possible <- total_mcq + total_code
     
-    #---------------------------
     # Save to Excel
-    #---------------------------
     file <- "results.xlsx"
-    
     new_entry <- data.frame(
-      student = input$student,
+      student = student_name,
       mcq_score = mcq_score,
       code_score = code_score,
       total = total_score,
@@ -128,11 +141,21 @@ mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
       write.xlsx(rbind(old, new_entry), file)
     }
     
-    # Display result
+    # Display message
     output$result <- renderText(
-      paste0("Score submitted for ", input$student,
-             ": ", total_score, " / ", total_possible,
-             ". Saved to Excel.")
+      paste0("Score for ", student_name, ": ",
+             total_score, "/", total_possible,
+             ". Saved to Excel. The quiz will now close.")
     )
+    
+    # Quit the app 1 second later
+    shinyjs::delay(1000, shiny::stopApp())
+  }
+  
+  #=====================================================
+  # Manual submission button
+  #=====================================================
+  observeEvent(input$submit, {
+    submit_quiz(auto = FALSE)
   })
 })
