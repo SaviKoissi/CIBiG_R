@@ -2,28 +2,30 @@ library(shiny)
 library(readr)
 library(openxlsx)
 library(dplyr)
+library(shinyjs)
 
 shinyServer(function(input, output, session) {
   
   #=====================================================
-  # TIMER: 1 hour (3600 seconds)
+  # TIMER — 1 hour (3600 seconds)
   #=====================================================
-  total_time <- 3600   # 1 hour
+  total_time <- 3600  # 1 hour
   rv <- reactiveValues(time_left = total_time)
   
-  # Update timer every second
-  autoInvalidate <- reactiveTimer(1000)
+  autoInvalidate <- reactiveTimer(1000)  # Update every second
   
   observe({
     autoInvalidate()
     rv$time_left <- rv$time_left - 1
     
-    # Display remaining time in mm:ss
     mins <- sprintf("%02d", rv$time_left %/% 60)
     secs <- sprintf("%02d", rv$time_left %% 60)
-    output$timer <- renderText(paste0("⏱ Remaining time: ", mins, ":", secs))
     
-    # If timer ends → autosubmit + quit
+    output$timer <- renderText(
+      paste0("⏱ Remaining time: ", mins, ":", secs)
+    )
+    
+    # If time runs out → auto-submit
     if (rv$time_left <= 0) {
       isolate({
         submit_quiz(auto = TRUE)
@@ -31,14 +33,17 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  #=====================================================
-  # Load MCQ Questions
-  #=====================================================
-  url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CIBiG_R/main/questions_mcq.csv"
-  mcq_df <- readr::read_csv(url_mcq, show_col_types = FALSE)
   
   #=====================================================
-  # Render MCQs
+  # Load MCQs from GitHub
+  #=====================================================
+  url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CIBiG_R/main/questions_mcq.csv"
+  
+  mcq_df <- read_csv(url_mcq, show_col_types = FALSE)
+  
+  
+  #=====================================================
+  # Build MCQ UI
   #=====================================================
   output$mcq_ui <- renderUI({
     lapply(seq_len(nrow(mcq_df)), function(i) {
@@ -54,6 +59,7 @@ shinyServer(function(input, output, session) {
       )
     })
   })
+  
   
   #=====================================================
   # Code Questions
@@ -72,8 +78,9 @@ shinyServer(function(input, output, session) {
     })
   })
   
+  
   #=====================================================
-  # Safe Evaluation Function
+  # Safe evaluate function
   #=====================================================
   safe_eval <- function(code) {
     tryCatch({
@@ -84,15 +91,19 @@ shinyServer(function(input, output, session) {
     })
   }
   
+  
   #=====================================================
-  # QUIZ SUBMISSION FUNCTION (manual or auto)
+  # QUIZ SUBMISSION FUNCTION (manual + auto)
   #=====================================================
   submit_quiz <- function(auto = FALSE) {
     
     student_name <- ifelse(is.null(input$student) || input$student == "",
-                           "Unknown Student", input$student)
+                           "Unknown Student",
+                           input$student)
     
-    # MCQ Scoring
+    #-------------------------------------------
+    # MCQ Grading
+    #-------------------------------------------
     mcq_score <- 0
     total_mcq <- nrow(mcq_df)
     
@@ -103,7 +114,10 @@ shinyServer(function(input, output, session) {
       }
     }
     
-    # Code scoring
+    
+    #-------------------------------------------
+    # Code Question Grading (safe)
+    #-------------------------------------------
     code_score <- 0
     total_code <- length(code_questions)
     
@@ -113,18 +127,32 @@ shinyServer(function(input, output, session) {
     )
     
     for (id in names(code_questions)) {
+      
       ans <- input[[id]]
+      
+      if (is.null(ans) || ans == "") {
+        next
+      }
+      
       required <- code_rules[[id]]
-      if (any(sapply(required, function(k) grepl(k, ans, fixed = TRUE)))) {
+      
+      matches <- sapply(required, function(k) grepl(k, ans, fixed = TRUE))
+      
+      if (isTRUE(any(matches))) {
         code_score <- code_score + 1
       }
     }
     
+    
     total_score <- mcq_score + code_score
     total_possible <- total_mcq + total_code
     
+    
+    #-------------------------------------------
     # Save to Excel
+    #-------------------------------------------
     file <- "results.xlsx"
+    
     new_entry <- data.frame(
       student = student_name,
       mcq_score = mcq_score,
@@ -141,21 +169,26 @@ shinyServer(function(input, output, session) {
       write.xlsx(rbind(old, new_entry), file)
     }
     
-    # Display message
+    
+    #-------------------------------------------
+    # Display result and exit
+    #-------------------------------------------
     output$result <- renderText(
       paste0("Score for ", student_name, ": ",
              total_score, "/", total_possible,
              ". Saved to Excel. The quiz will now close.")
     )
     
-    # Quit the app 1 second later
-    shinyjs::delay(1000, shiny::stopApp())
+    # Quit app after short delay
+    shinyjs::delay(1500, shiny::stopApp())
   }
   
+  
   #=====================================================
-  # Manual submission button
+  # Manual SUBMIT button
   #=====================================================
   observeEvent(input$submit, {
     submit_quiz(auto = FALSE)
   })
+  
 })
