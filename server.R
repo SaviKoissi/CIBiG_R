@@ -151,7 +151,8 @@ shinyServer(function(input, output, session) {
   # -----------------------------
   # 5. Submission function (robust)
   # -----------------------------
-  results_file <- "results.xlsx"
+  results_file <- "/Users/koissi/Desktop/WAVE_project/CBIG/IntroR_Bioinfo/results.xlsx"
+
   
   submit_quiz <- function(auto = FALSE) {
     # Prevent double-submit in this R session
