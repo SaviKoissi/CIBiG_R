@@ -12,3 +12,4 @@ Q10,"Which Bioconductor object stores genomic intervals?","DNAStringSet","GRange
 Q11,"Why loops should be avoided in R ?","Their writing is too error prone","Loops are fine in R","Loops are not memory efficient in R","Loops do not exist in R","Loops are not memory efficient in R"
 Q12,"How to define your working directory ?",apply(),"getwd()","setwd()","str()","setwd()"
 Q13,"How to comment a line in R?","Add a space at the beginning of a line","Add # at the beginning of a line","Add ! at the beginning of a line","Add # at the end of a line","Add # at the beginning of a line"
+Q14,"How many dimensions has the seqs objetc ? \nseqs <- c('GAGTT','CAGGCAT','ATATGGTA')","1 dimension","2 dimensions","3 dimensions","This object has no dimension","1 dimension"
