@@ -1,11 +1,12 @@
 # server.R 
 library(shiny)
 library(readr)
-library(openxlsx)
 library(dplyr)
 library(shinyjs)
+library(blastula)
 
 shinyServer(function(input, output, session) {
+  
   
   # -----------------------------
   # 0. Helpers
@@ -22,51 +23,162 @@ shinyServer(function(input, output, session) {
     )
   }
   
-  coerce_old_results <- function(old) {
-    # If old is NULL or invalid, return empty standard DF
-    if (is.null(old) || (!is.data.frame(old))) return(empty_results_df())
-    
-    # Ensure expected columns exist; add missing as NA
-    expected <- names(empty_results_df())
-    missing_cols <- setdiff(expected, names(old))
-    if (length(missing_cols) > 0) {
-      for (mc in missing_cols) old[[mc]] <- NA
-    }
-    
-    # Keep only expected columns in order
-    old <- old[, expected, drop = FALSE]
-    
-    # Coerce types defensively
-    old$student <- as.character(old$student)
-    old$mcq_score <- suppressWarnings(as.integer(as.numeric(old$mcq_score)))
-    old$code_score <- suppressWarnings(as.integer(as.numeric(old$code_score)))
-    old$total <- suppressWarnings(as.integer(as.numeric(old$total)))
-    old$total_possible <- suppressWarnings(as.integer(as.numeric(old$total_possible)))
-    old$timestamp <- as.character(old$timestamp)
-    
-    # Replace any NA in numeric columns with 0 (optional - keep NA if you prefer)
-    old$mcq_score[is.na(old$mcq_score)] <- 0L
-    old$code_score[is.na(old$code_score)] <- 0L
-    old$total[is.na(old$total)] <- 0L
-    old$total_possible[is.na(old$total_possible)] <- 0L
-    
-    return(old)
+  # # -----------------------------
+  # # EMAIL SENDING FUNCTION
+  # # -----------------------------
+  # send_result_email <- function(student_name, mcq_score, code_score, total_score, total_possible, code_answers) {
+  #   tryCatch({
+  #     # Create email body
+  #     email_body <- paste0(
+  #       "Quiz Results\n",
+  #       "====================\n\n",
+  #       "Student: ", student_name, "\n",
+  #       "Timestamp: ", Sys.time(), "\n\n",
+  #       "Scores:\n",
+  #       "-------\n",
+  #       "MCQ Score: ", mcq_score, "/", nrow(mcq_df), "\n",
+  #       "Code Score: ", code_score, "/", length(code_questions), "\n",
+  #       "Total Score: ", total_score, "/", total_possible, "\n\n",
+  #       "Code Answers:\n",
+  #       "-------------\n"
+  #     )
+  # 
+  #     # Append code answers
+  #     for (id in names(code_questions)) {
+  #       ans <- code_answers[[id]]
+  #       if (is.null(ans)) ans <- "[No answer provided]"
+  #       email_body <- paste0(
+  #         email_body,
+  #         "\n", id, ": ", code_questions[[id]], "\n",
+  #         "Answer:\n", ans, "\n",
+  #         "-------------------\n"
+  #       )
+  #     }
+  # 
+  #     # Create email
+  #     email <- compose_email(
+  #       body = md(paste0("```\n", email_body, "\n```"))
+  #     )
+  # 
+  #     # Send email
+  #     smtp_send(
+  #       email,
+  #       from = cfg$user,
+  #       to = cfg$user,
+  #       subject = paste0("CiBIGR Quiz Result - ", student_name, " - ", format(Sys.time(), "%Y-%m-%d %H:%M")),
+  #       credentials = cfg
+  #     )
+  # 
+  #     return(TRUE)
+  #   }, error = function(e) {
+  #     warning("Failed to send email: ", e$message)
+  #     return(FALSE)
+  #   })
+  # }
+  
+  
+  # -----------------------------
+  # EMAIL SENDING FUNCTION
+  # -----------------------------
+  send_result_email <- function(student_name, mcq_score, code_score, total_score, total_possible, code_answers) {
+    tryCatch({
+      # Create email body header
+      email_body <- paste0(
+        "Quiz Results\n",
+        "====================\n\n",
+        "Student: ", student_name, "\n",
+        "Timestamp: ", Sys.time(), "\n\n",
+        "Scores:\n",
+        "-------\n",
+        "MCQ Score: ", mcq_score, "/", nrow(mcq_df), "\n",
+        "Code Score: ", code_score, "/", length(code_questions), "\n",
+        "Total Score: ", total_score, "/", total_possible, "\n\n",
+        "Code Answers:\n",
+        "-------------\n"
+      )
+      
+      # ===== Add MCQ detailed info here =====
+      email_body <- paste0(email_body, "\nMCQ Details:\n-------------\n")
+      for (i in seq_len(nrow(mcq_df))) {
+        qid <- mcq_df$id[i]
+        question_text <- mcq_df$question[i]
+        correct_answer <- mcq_df$answer[i]
+        
+        # Attempt to get the student's answer from input if possible, else "[No answer]"
+        student_answer <- if (!is.null(input[[qid]])) input[[qid]] else "[No answer provided]"
+        
+        correctness <- if (identical(as.character(student_answer), as.character(correct_answer))) {
+          "✔ Correct"
+        } else {
+          "✘ Incorrect"
+        }
+        
+        email_body <- paste0(
+          email_body,
+          "Q", i, " (", qid, "): ", question_text, "\n",
+          "Your answer: ", student_answer, "\n",
+          "Correct answer: ", correct_answer, "\n",
+          "Result: ", correctness, "\n\n"
+        )
+      }
+      
+      # ===== Add code question detailed info here =====
+      email_body <- paste0(email_body, "\nCode Question Details:\n-----------------------\n")
+      # Assume code_rules is globally accessible for this; if not, must add param (but you requested no change)
+      for (id in names(code_questions)) {
+        question_text <- code_questions[[id]]
+        ans <- code_answers[[id]]
+        if (is.null(ans) || trimws(ans) == "") ans <- "[No answer provided]"
+        
+        # Attempt to get required keywords from code_rules global object
+        required_keywords <- NULL
+        if (exists("code_rules")) {
+          required_keywords <- code_rules[[id]]
+        }
+        
+        # Build keyword match details if available
+        if (!is.null(required_keywords)) {
+          matches <- sapply(required_keywords, function(k) grepl(k, ans, fixed = FALSE))
+          keywords_status <- paste0(
+            paste(required_keywords, ifelse(matches, "✔ found", "✘ missing"), collapse = "\n"),
+            "\n"
+          )
+          summary_line <- if (any(matches)) "✔ Required elements detected" else "✘ Required elements missing"
+        } else {
+          keywords_status <- "No keyword rules found for this question.\n"
+          summary_line <- ""
+        }
+        
+        email_body <- paste0(
+          email_body,
+          "Code Question (", id, "): ", question_text, "\n",
+          "Your code:\n", ans, "\n\n",
+          "Required keywords:\n", keywords_status, "\n",
+          "Summary: ", summary_line, "\n\n"
+        )
+      }
+      
+      # Create email
+      email <- compose_email(
+        body = md(paste0("```\n", email_body, "\n```"))
+      )
+      
+      # Send email
+      smtp_send(
+        email,
+        from = cfg$user,
+        to = cfg$user,
+        subject = paste0("CIBiR R Quiz Result - ", student_name, " - ", format(Sys.time(), "%Y-%m-%d %H:%M")),
+        credentials = cfg
+      )
+      
+      return(TRUE)
+    }, error = function(e) {
+      warning("Failed to send email: ", e$message)
+      return(FALSE)
+    })
   }
   
-  safe_bind_rows <- function(a, b) {
-    # Try regular bind_rows, fallback to character coercion
-    out <- tryCatch({
-      bind_rows(a, b)
-    }, error = function(e) {
-      # convert all columns to character to ensure bind works
-      a2 <- a
-      b2 <- b
-      a2[] <- lapply(a2, function(x) as.character(x))
-      b2[] <- lapply(b2, function(x) as.character(x))
-      bind_rows(a2, b2)
-    })
-    return(out)
-  }
   
   # -----------------------------
   # 1. Timer configuration (1 hour)
@@ -80,19 +192,16 @@ shinyServer(function(input, output, session) {
   # -----------------------------
   # 2. Load MCQ data safely
   # -----------------------------
-  url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CIBiG_R/main/questions_mcq.csv"
+  url_mcq <- "https://raw.githubusercontent.com/SaviKoissi/CiBiGR/main/questions_mcq.csv"
   
   mcq_df <- tryCatch({
-    # read_csv returns a tibble; coerce to data.frame for stable indexing
     as.data.frame(read_csv(url_mcq, show_col_types = FALSE), stringsAsFactors = FALSE)
   }, error = function(e) {
-    # Do NOT stop the app here; show friendly modal and provide fallback empty MCQ DF
     showModal(modalDialog(
       title = "Error loading questions",
       paste0("Could not read MCQ file at:\n", url_mcq, "\n\n", e$message),
       easyClose = TRUE
     ))
-    # return a minimal dataframe so UI can render a friendly message
     data.frame(id = "missing",
                question = "Questions file could not be loaded. Contact the instructor.",
                choice1 = "N/A", choice2 = "N/A", choice3 = "N/A", choice4 = "N/A",
@@ -105,7 +214,7 @@ shinyServer(function(input, output, session) {
     mcq_df[[rc]] <- NA
   }
   
-  # Ensure id is character and unique (prefix to avoid invalid inputId like numeric)
+  # Ensure id is character and unique
   mcq_df$id <- as.character(mcq_df$id)
   mcq_df$id <- paste0("q_", make.names(mcq_df$id))
   
@@ -114,7 +223,6 @@ shinyServer(function(input, output, session) {
   # -----------------------------
   output$mcq_ui <- renderUI({
     req(mcq_df)
-    # If mcq_df contains just the fallback "missing" row, user sees message
     panels <- lapply(seq_len(nrow(mcq_df)), function(i) {
       q <- mcq_df[i, ]
       qid <- q$id
@@ -149,17 +257,13 @@ shinyServer(function(input, output, session) {
   })
   
   # -----------------------------
-  # 5. Submission function (robust)
+  # 5. Submission function (with email)
   # -----------------------------
-  results_file <- "/Users/koissi/Desktop/WAVE_project/CBIG/IntroR_Bioinfo/results.xlsx"
-
-  
   submit_quiz <- function(auto = FALSE) {
-    # Prevent double-submit in this R session
     if (isTRUE(rv$submitted)) return(invisible(NULL))
     rv$submitted <- TRUE
     
-    # sanitize student name
+    # Sanitize student name
     student_name <- input$student
     if (is.null(student_name) || trimws(as.character(student_name)) == "") {
       student_name <- "Unknown Student"
@@ -172,30 +276,38 @@ shinyServer(function(input, output, session) {
       for (i in seq_len(nrow(mcq_df))) {
         q <- mcq_df[i, ]
         qid <- q$id
-        # protect against missing input
         ans <- NULL
         if (!is.null(input[[qid]])) ans <- input[[qid]]
-        # compare as character; NA answers will be treated as incorrect
         if (!is.null(ans) && !is.na(q$answer) && as.character(ans) == as.character(q$answer)) {
           mcq_score <- mcq_score + 1L
         }
       }
     }
     
-    # Code scoring (simple keyword-based)
+    # Code scoring
     code_score <- 0L
     code_rules <- list(
       C1 = c("sum", "%in%", "nchar"),
       C2 = c("mean")
     )
+    
+    # Collect code answers
+    code_answers <- list()
     for (id in names(code_questions)) {
       ans <- input[[id]]
-      if (is.null(ans) || trimws(as.character(ans)) == "") next
-      required <- code_rules[[id]]
-      matches <- sapply(required, function(k) {
-        grepl(k, ans, fixed = FALSE)
-      })
-      if (any(matches)) code_score <- code_score + 1L
+      code_answers[[id]] <- if (is.null(ans) || trimws(as.character(ans)) == "") {
+        "[No answer provided]"
+      } else {
+        as.character(ans)
+      }
+      
+      if (!is.null(ans) && trimws(as.character(ans)) != "") {
+        required <- code_rules[[id]]
+        matches <- sapply(required, function(k) {
+          grepl(k, ans, fixed = FALSE)
+        })
+        if (any(matches)) code_score <- code_score + 1L
+      }
     }
     
     total_mcq <- nrow(mcq_df)
@@ -203,60 +315,39 @@ shinyServer(function(input, output, session) {
     total_score <- as.integer(mcq_score + code_score)
     total_possible <- as.integer(total_mcq + total_code)
     
-    # new entry (guarantee types)
-    new_entry <- data.frame(
-      student = as.character(student_name),
-      mcq_score = as.integer(mcq_score),
-      code_score = as.integer(code_score),
-      total = as.integer(total_score),
-      total_possible = as.integer(total_possible),
-      timestamp = as.character(Sys.time()),
-      stringsAsFactors = FALSE
+    # Send email with results
+    email_sent <- send_result_email(
+      student_name, 
+      mcq_score, 
+      code_score, 
+      total_score, 
+      total_possible,
+      code_answers
     )
     
-    # read old safely (if exists), coerce types, combine safely
-    old <- tryCatch({
-      if (!file.exists(results_file)) NULL else read.xlsx(results_file)
-    }, error = function(e) {
-      # show a non-fatal message in console; keep app alive
-      message("Warning: couldn't read existing results.xlsx; proceeding with empty table. ", e$message)
-      NULL
-    })
-    
-    old_safe <- coerce_old_results(old)
-    combined <- safe_bind_rows(old_safe, new_entry)
-    
-    # write safely to temporary file then replace
-    tmpf <- paste0(results_file, ".tmp")
-    tryCatch({
-      write.xlsx(combined, tmpf)
-      # attempt atomic move
-      if (!file.rename(tmpf, results_file)) {
-        # fallback: try remove + rename
-        if (file.exists(results_file)) file.remove(results_file)
-        file.rename(tmpf, results_file)
-      }
-    }, error = function(e) {
-      warning("Failed to write results.xlsx: ", e$message)
-    })
-    
-    # show result to the user
+    # Show result to the user
     output$result <- renderText({
-      paste0(
-        "Score for ", student_name, ": ",
-        total_score, "/", total_possible,
-        ". Saved."
-      )
+      if (email_sent) {
+        paste0(
+          "Score for ", student_name, ": ",
+          total_score, "/", total_possible,
+          ". Results sent to instructor!"
+        )
+      } else {
+        paste0(
+          "Score for ", student_name, ": ",
+          total_score, "/", total_possible,
+          ". WARNING: Email failed to send. Please contact instructor."
+        )
+      }
     })
     
-    # UI toggles: hide submit, show quit
+    # UI toggles
     shinyjs::hide("submit")
     shinyjs::show("quit")
     
-    # if auto (timer), close after flush (small safe delay is okay)
     if (isTRUE(auto)) {
       session$onFlushed(function() {
-        # stopApp will end the server; we only call it after UI has sent the final message
         stopApp()
       }, once = TRUE)
     }
@@ -279,25 +370,31 @@ shinyServer(function(input, output, session) {
   # -----------------------------
   # 7. Timer loop (1s)
   # -----------------------------
-  # observe({
-  #   req(mcq_df)
-  #   timer()
-  #   message("Timer tick: time_left = ", rv$time_left)
-  #   
-  #   if (isTRUE(rv$submitted)) {
-  #     message("Timer stopped: already submitted")
-  #     return()
-  #   }
-  #   
-  #   rv$time_left <- max(0, rv$time_left - 1)
-  #   
-  #   if (rv$time_left == 0 && !isTRUE(rv$submitted)) {
-  #     message("Time expired - auto submitting quiz")
-  #     isolate(submit_quiz(auto = TRUE))
-  #   }
-  # })
-  # 
-  
+  observe({
+    invalidateLater(1000, session)
+    req(mcq_df)
+    timer$stop("quizz")
+    output$timer <- renderText({
+      time_left <- total_time - getTimer(timer)$timeElapsed
+      if(time_left > 60) {
+        paste(round(time_left/60, 0), "minutes remaining...")
+      } else {
+        paste(time_left, "seconds remaining...")
+      }
+    })
+    
+    if (getTimer(timer)$timeElapsed >= total_time) {
+      showModal(modalDialog(
+        title = "Time Over!",
+        "Time expired - auto submitting quiz...",
+        footer = NULL
+      ))
+      Sys.sleep(5)
+      isolate(submit_quiz(auto = TRUE))
+      stopApp()
+    }
+  })
+  #  
   # -----------------------------
   # 8. UI initial state
   # -----------------------------
