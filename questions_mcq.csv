@@ -7,7 +7,6 @@ Q5,"What does this code compute? sum(strsplit('ATGCGC','')[[1]] %in% c('G','C'))
 Q6,Which function reads a CSV file?,read.csv(),load(),seq(),apply(),read.csv()
 Q7,What is TRUE about a data.frame in R?,All columns must have the same length,Only numeric columns allowed,Cannot contain characters,Cannot be used in bioinformatics,All columns must have the same length
 Q8,Why loops should be avoided in R ?,Their writing is too error prone,Loops are fine in R,Loops are not memory efficient in R,Loops do not exist in R,Loops are not memory efficient in R
-Q9,How to define your working directory ?,apply(),getwd(),setwd(),str(),setwd()
-Q10,How to comment a line in R?,Add a space at the beginning of a line,Add # at the beginning of a line,Add ! at the beginning of a line,Add # at the end of a line,Add # at the beginning of a line
-Q11,"How many dimensions has the seqs object ? seqs <- c('GAGTT','CAGGCAT','ATATGGTA')",1 dimension,2 dimensions,3 dimensions,This object has no dimension,1 dimension
-Q12,"How to set the row names of the m object ? m <- matrix(1:9, nrow=3)","names(m) <- c('tic','tac','toc')","rownames(m) <- c('tic','tac')","rownames(m) <- c('tic','tac','toc')","dimnames(m) <- c('tic','tac','toc')","rownames(m) <- c('tic','tac','toc')"
+Q9,How to comment a line in R?,Add a space at the beginning of a line,Add # at the beginning of a line,Add ! at the beginning of a line,Add # at the end of a line,Add # at the beginning of a line
+Q10,"How many dimensions has the seqs object ? seqs <- c('GAGTT','CAGGCAT','ATATGGTA')",1 dimension,2 dimensions,3 dimensions,This object has no dimension,1 dimension
+Q11,"How to set the row names of the m object ? m <- matrix(1:9, nrow=3)","names(m) <- c('tic','tac','toc')","rownames(m) <- c('tic','tac')","rownames(m) <- c('tic','tac','toc')","dimnames(m) <- c('tic','tac','toc')","rownames(m) <- c('tic','tac','toc')"
